@@ -24,12 +24,12 @@ import javafx.util.Duration;
  * Clean up all of these classes. Make actual classes for Board and Game.
  * Figure out why trees make the screen lag
  * Make the camera less jerky
+ * 3/16 Not bad
  */
 public class Map extends Pane{
 	
 	private GameApplication game;
-	private TestManager gameManager;
-	private InGameMenu menu;
+	private InGameScreen menu;
 	public static final int TILE_SIZE = 40;
 	public static final int X_DIM_TILES = 20;
     public static final int Y_DIM_TILES = 20;
@@ -51,7 +51,6 @@ public class Map extends Pane{
     private Image GRASS = new Image(getClass().getClassLoader()
     		.getResource("res/ScenerySprite/grasssquare.png").toString());
     
-    private Hero hero;
     private GameTile[][] tiles = new GameTile[X_DIM_TILES][Y_DIM_TILES];
     
 	public Map(GameApplication game){
@@ -62,23 +61,24 @@ public class Map extends Pane{
 		this.setPrefHeight(TILE_SIZE * Y_DIM_TILES);
 		
 		setUpScreen();
-		hero = new Hero(this);
-		addHero();
-		initVisible();
 	}
-	public void setManager(TestManager gameManager){
-		this.gameManager = gameManager;
+	
+	public InGameScreen getCurrentMenu(){
+		return menu;
 	}
-	public void addDialogueBox(String dialogue){
-		gameManager.setState(TestManager.DIALOGUE);
-		menu = new Dialogue(this, dialogue);
+	
+	public void addDialogue(String dialogue, Hero hero){
+		menu = new Dialogue(this, dialogue, hero);
 		getChildren().add(menu);
-		gameManager.setMenu(menu);
 	}
-	public void removeDialougeBox(){
-		gameManager.setState(TestManager.ROAM);
+	
+	public void openMenu(Hero hero){
+		menu = new Menu(this, hero);
+	}
+	
+	public void removeScreen(){
 		getChildren().remove(menu);
-		gameManager.setMenu(null);
+		menu = null;
 	}
 	
 	public GameApplication getGame(){
@@ -87,46 +87,46 @@ public class Map extends Pane{
 	public boolean checkTile(double x, double y){
 		return (x < X_DIM_TILES && x >= 0 && y < Y_DIM_TILES && y >= 0 && tiles[(int)x][(int)y].getPassable());
 	}
-	public Hero getHero(){
-		return hero;
-	}
-	
-	public void addHero(){
-		hero.setLocation(6, 6);
-	}
 	
 	public GameTile getTile(int x, int y){
 		return tiles[x][y];
 	}
 	
+	
+	
 	/*
 	 * this needs some work
+	 * 3/16 good to go
 	 */
-	public void initVisible(){
-		int x = (int)(hero.getX() - Map.CAMERA_X);
-		int y = (int)(hero.getY() - Map.CAMERA_Y);
-		for (int i = x; i < x + Map.WINDOW_X; i++){
-			for (int j = y; j < y + Map.WINDOW_Y; j++){
+	public void initVisible(Hero hero){
+		int x = (int)(hero.getX());
+		int y = (int)(hero.getY());
+		int start_y = y - Map.CAMERA_Y - hero.getRelY();
+		int end_y = y + Map.DELTA_Y - hero.getRelY();
+		int start_x = x - Map.CAMERA_X - hero.getRelX();
+		int end_x = x + Map.DELTA_X - hero.getRelX();
+		for (int i = start_x; i < end_x; i++){
+			for (int j = start_y; j < end_y; j++){
 				tiles[i][j].setVisible(true);
 			}
 		}
 	}
 	
-	
 	/*
 	 * xClean up! Also delay row/column deletion until after Hero moves
 	 * Update 1/1 looks quite good
+	 * 3/14 cleaned up a bit
 	 */
-	public void visible(int code, int relativeX, int relativeY){
+	public void visible(int code, Hero hero){
 		Timeline timeline = new Timeline();
 		KeyFrame keyframe;
 		
 		int x = (int)(hero.getX());
 		int y = (int)(hero.getY());
-		int start_y = y - Map.CAMERA_Y - relativeY;
-		int end_y = y + Map.DELTA_Y - relativeY;
-		int start_x = x - Map.CAMERA_X - relativeX;
-		int end_x = x + Map.DELTA_X - relativeX;
+		int start_y = y - Map.CAMERA_Y - hero.getRelY();
+		int end_y = y + Map.DELTA_Y - hero.getRelY();
+		int start_x = x - Map.CAMERA_X - hero.getRelX();
+		int end_x = x + Map.DELTA_X - hero.getRelX();
 		switch (code){
 		case(Hero.LEFT):
 		if (x > Map.CAMERA_X && x + Map.DELTA_X <= Map.X_DIM_TILES 
@@ -201,13 +201,15 @@ public class Map extends Pane{
 		}
 		timeline.play();
 	}
-	public void visibleDebug(int code, int relativeX, int relativeY){
+	
+
+	public void visibleDebug(int code, Hero hero){
 		int x = (int)(hero.getX());
 		int y = (int)(hero.getY());
-		int start_y = y - Map.CAMERA_Y - relativeY;
-		int end_y = y + Map.DELTA_Y - relativeY;
-		int start_x = x - Map.CAMERA_X - relativeX;
-		int end_x = x + Map.DELTA_X - relativeX;
+		int start_y = y - Map.CAMERA_Y - hero.getRelY();
+		int end_y = y + Map.DELTA_Y - hero.getRelY();
+		int start_x = x - Map.CAMERA_X - hero.getRelX();
+		int end_x = x + Map.DELTA_X - hero.getRelX();
 		switch (code){
 		case(Hero.LEFT):
 		if (x > Map.CAMERA_X && x + Map.DELTA_X <= Map.X_DIM_TILES 
@@ -252,10 +254,10 @@ public class Map extends Pane{
 	public void setUpScreen(){
 			for (int i = 0; i < X_DIM_TILES; i++){
 				for (int j = 0; j < Y_DIM_TILES; j++){
-					addTile(i, j, GRASS, true, false);
+					addScenery(i, j, GRASS, true);
 				}
 			}
-			for (int i = 0; i < X_DIM_TILES; i++){
+			/*for (int i = 0; i < X_DIM_TILES; i++){
 				addTile(0, i, TREE, false, false);
 			}
 			for (int i = 1; i < Y_DIM_TILES; i++){
@@ -263,24 +265,40 @@ public class Map extends Pane{
 			}
 			for (int i = 0; i < Y_DIM_TILES-1; i++){
 				addTile(X_DIM_TILES-1, i+1, TREE, false, false);
-			}
+			}*/
 			
 			addTile(5, 5, TREE, false, true);
-			tiles[5][5].setText("I'm a tree! \nHow are you doing today?" 
+			addText(5, 5, "I'm a tree! \nHow are you doing today?" 
 					+ "_I love you.");
 			
 			addTile(7, 5, TREE, false, true);
-			tiles[7][5].setText("I'm also a tree!");
+			addText(7, 5, "I'm also a tree!");
 			
 			addTile(1, 5, TREE, false, true);
-			tiles[1][5].setText("I'm not a tree! _What are you looking at?");
+			addText(1, 5, "I'm not a tree! _What are you looking at?");
 			
 			addTile(3, 5, TREE, false, true);
-			tiles[3][5].setText("Hello World. \nI'm a tree. _Love me.");
+			addText(3, 5, "Hello World. \nI'm a tree. _Love me.");
 			
 			addTile(3, 6, TREE, false, true);
 			addTile(4, 7, TREE, false, true);
-			tiles[4][7].setText("Hi");
+			
+			for (int i = 1; i < Map.Y_DIM_TILES - 2; i ++){
+				if (i != 6){
+					addScenery(8, i, TREE, false);
+					addScenery(6, i, TREE, false);
+				}
+			}
+			
+			addTile(18, 18, TREE, false, true);
+			addTile(18, 17, TREE, false, true);
+			addTile(18, 1, TREE, false, true);
+			addTile(18, 0, TREE, false, true);
+			addTile(1, 18, TREE, false, true);
+			addTile(1, 17, TREE, false, true);
+			addTile(1, 1, TREE, false, true);
+			addTile(1, 0, TREE, false, true);
+			((InteractTile)(tiles[4][7])).setText("Hi");
 			for (int i = 0; i < X_DIM_TILES; i++){
 				for (int j = 0; j < Y_DIM_TILES; j++){
 					tiles[i][j].setVisible(false);
@@ -289,10 +307,23 @@ public class Map extends Pane{
 			
 				
 	}
+	public void addScenery(int xCord, int yCord, Image image, boolean passable){
+		SceneryTile tile = new SceneryTile(this, image, passable);
+		tile.setLocation(xCord, yCord);
+		tiles[xCord][yCord] = tile;
+	}
+	
 	public void addTile(int xCord, int yCord, Image image, boolean passable,
 			boolean interact){
-		SceneryTile tile = new SceneryTile(this, image, passable, interact);
+		InteractTile tile = new InteractTile(this, image, passable);
 		tile.setLocation(xCord, yCord);
 		tiles[xCord][yCord] = tile; 
+	}
+	
+	public void addText(int xCord, int yCord, String text){
+		if (tiles[xCord][yCord] instanceof InteractTile){
+			InteractTile tile = ((InteractTile)(tiles[xCord][yCord]));
+			tile.setText(text);
+		}
 	}
 }

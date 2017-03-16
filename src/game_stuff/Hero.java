@@ -66,6 +66,7 @@ public class Hero {
 	
 	private int facing;
 	private boolean moving;
+	private boolean frozen = false;
 	private int relativeX;
 	private int relativeY;
 	
@@ -74,17 +75,14 @@ public class Hero {
 	public final static int UP = 3;
 	public final static int DOWN = 4;
 	public final static double moveTime = 600;
+	private int idleTime = 0;
 	
 	public Hero(Map map){
 		moving = false;
 		
 		//These depend on game design, careful
-		facing = DOWN;
-		relativeX = 0;
-		relativeY = 0;
-		
-		//By default, character facing down. Also depends on game design.
-		image = new ImageView(DOWN1);
+		facing = UP;
+		image = new ImageView(FORWARD1);
 		
 		this.map = map;
 		image.setFitHeight(Map.TILE_SIZE);
@@ -94,11 +92,23 @@ public class Hero {
 		image.xProperty().bind(x_cord.multiply(Map.TILE_SIZE));
         image.yProperty().bind(y_cord.multiply(Map.TILE_SIZE));
         
+        setLocation(0, 0); //by default, throw the hero at location 0, 0
+       
+        
 	}
 	
+	/**
+	 * Get the relative x coordinate of hero
+	 * @return The relative x coordinate
+	 */
 	public int getRelX(){
 		return relativeX;
 	}
+	
+	/**
+	 * Get the relative y coordinate of hero
+	 * @return The relative y coordinate
+	 */
 	public int getRelY(){
 		return relativeY;
 	}
@@ -133,18 +143,96 @@ public class Hero {
 	public ImageView getImage(){
 		return image;
 	}
+	
+	public void freeze(){
+		frozen = true;
+	}
+	
+	public void thaw(){
+		frozen = false;
+	}
+	
+	public void incrementIdle(){
+		if (!frozen){
+			idleTime++;
+			if (idleTime > 12){
+				idleAnimation();
+				idleTime = 0;
+			}
+			else if (idleTime == 10){
+				idleAnimation();
+			}
+		}
+	}
+	
+	private void idleAnimation(){
+		if (!moving){
+		Image frame1;
+		Image frame2;
+		switch (facing){
+		case LEFT:
+			frame1 = LEFT1;
+			frame2 = LEFT2;
+			break;
+		case RIGHT:
+			frame1 = RIGHT1;
+			frame2 = RIGHT2;
+			break;
+		case UP:
+			frame1 = FORWARD1;
+			frame2 = FORWARD2;
+			break;
+		case DOWN:
+			frame1 = DOWN1;
+			frame2 = DOWN2;
+			break;
+		default:
+			frame1 = LEFT1;
+			frame2 = LEFT2;
+			break;
+		}
+		if (image.getImage().equals(frame1))
+			image.setImage(frame2);
+		else
+			image.setImage(frame1);
+		
+		}
+	}
+	
+	public boolean getMoving(){
+		return moving;
+	}
+	
+	public void createMenu(){
+		map.openMenu(this);
+	}
+	
+	/**
+	 * Get the direction the hero is facing
+	 * Used for interactWith method
+	 * @return The direction the hero is facing
+	 */
 	public int getFacing(){
 		return facing;
 	}
+	
+	/**
+	 * Manually set the location of the hero. Initialize relative coordinates of new location.
+	 * @param x The x coordinate
+	 * @param y The y coordinate
+	 */
 	public void setLocation(double x, double y) {
+		relativeX = 0;
+		relativeY = 0;
         x_cord.set(x);
         y_cord.set(y);
+        initRelatives();
     }
 	
-	/*
-	 * Will attempt to interact with whatever tile the character is facing
+	/**
+	 * The hero will attempt to interact with whatever tile they are facing.
 	 */
-	public void interactWith(){
+	public boolean interactWith(){
 	if (!moving){
 		GameTile tile = null;
 		int x;
@@ -182,23 +270,27 @@ public class Hero {
 			tile = null;
 			break;
 		}
-		if (tile != null && tile.canInteract()){
-			tile.interact();
+		if (tile != null && tile instanceof InteractTile){
+			((InteractTile)(tile)).interact(this);
+			return true;
 		}
 	}
+	return false;
 	}
 	
-	/*
-	 * method that handles move animations for all directions, depending
-	 * on the given code integer.
+	/**
+	 * The hero will go through one walk cycle.
+	 * @param direction The direction of the walk cycle
+	 * @param time The amount of time used for the walk cycle
 	 */
-	public void moveAnimation(int code, double time){
+	public void moveAnimation(int direction, double time){
+		idleTime = 0;
 		Image frame1;
 		Image frame2;
 		Image frame3;
 		Image frame4;
 		Image frame5;
-		switch (code){
+		switch (direction){
 		case LEFT:
 			frame1 = LEFT2;
 			frame2 = LEFT3;
@@ -277,9 +369,32 @@ public class Hero {
 		});
 		timeline.play();
 	}
-
-	public void computeRelatives(int code){
-		switch(code){
+	
+	/**
+	 * Initialize the relative coordinates of the hero.
+	 */
+	public void initRelatives(){
+		if (getX() - Map.CAMERA_X < 0){
+			relativeX = (int) (getX() - Map.CAMERA_X);
+		}
+		else if(getX() + Map.CAMERA_X > Map.X_DIM_TILES){
+			relativeX = (int) (Map.DELTA_X - (Map.X_DIM_TILES - getX()));
+		}
+		if (getY() - Map.CAMERA_Y < 0){
+			relativeY = (int) (getY() - Map.CAMERA_Y);
+		}
+		else if (getY() + Map.CAMERA_Y > Map.Y_DIM_TILES){
+			relativeY = (int) (Map.DELTA_Y - (Map.Y_DIM_TILES - getY()));
+		}
+	}
+	
+	/**
+	 * Relative coordinates are calculated based on the hero's distance
+	 * from the edge of the screen.
+	 * @param direction The direction the hero is moving
+	 */
+	public void computeRelatives(int direction){
+		switch(direction){
 		case(LEFT):
 			if (getX() - 1 < Map.CAMERA_X){
 				relativeX = (int) (getX() - Map.CAMERA_X - 1);
@@ -309,6 +424,7 @@ public class Hero {
 		}
 	}
 	
+	
 	/*
 	 * All move methods first check to make sure the Character can move,
 	 * then will shift the character to the given direction in
@@ -320,9 +436,10 @@ public class Hero {
 			moving = true;
 			if (getX() > Map.CAMERA_X){
 				if (!GameApplication.DEBUG)
-					map.visible(LEFT, relativeX, relativeY);
+					map.visible(LEFT, this);
+					//map.visible(LEFT, relativeX, relativeY);
 				else
-					map.visibleDebug(LEFT, relativeX, relativeY);
+					map.visibleDebug(LEFT, this);
 			}
 			computeRelatives(LEFT);
 			moveAnimation(LEFT, moveTime);
@@ -354,9 +471,9 @@ public class Hero {
 			moving = true;
 			if (getX() + Map.DELTA_X < Map.X_DIM_TILES){
 				if (!GameApplication.DEBUG)
-					map.visible(RIGHT, relativeX, relativeY);
+					map.visible(RIGHT, this);
 				else
-					map.visibleDebug(RIGHT, relativeX, relativeY);
+					map.visibleDebug(RIGHT, this);
 			}
 			computeRelatives(RIGHT);
 			moveAnimation(RIGHT, moveTime);
@@ -386,9 +503,9 @@ public class Hero {
 			moving = true;
 			if (getY() > Map.CAMERA_Y){
 				if (!GameApplication.DEBUG)
-					map.visible(UP, relativeX, relativeY);
+					map.visible(UP, this);
 				else
-					map.visibleDebug(UP, relativeX, relativeY);
+					map.visibleDebug(UP, this);
 			}
 			computeRelatives(UP);
 			moveAnimation(UP, moveTime);
@@ -417,9 +534,9 @@ public class Hero {
 			moving = true;
 			if (getY() + Map.DELTA_Y < Map.Y_DIM_TILES){
 				if (!GameApplication.DEBUG)
-					map.visible(DOWN, relativeX, relativeY);
+					map.visible(DOWN, this);
 				else
-					map.visibleDebug(DOWN, relativeX, relativeY);
+					map.visibleDebug(DOWN, this);
 			}
 			computeRelatives(DOWN);
 			moveAnimation(DOWN, moveTime);

@@ -2,6 +2,9 @@ package game_stuff;
 
 import javafx.animation.FadeTransition;
 import javafx.util.Duration;
+import menu_stuff.Game;
+import menu_stuff.SelectionScreen;
+import menu_stuff.TestLevel;
 
 public class GameManager {
 	

@@ -17,10 +17,8 @@ public class GameApplication extends Application{
 	public final static boolean DEBUG = false;
 	
 	private Map map;
-	private Hero hero;
-	
 	private Timeline animation;
-	private int updateTime;
+	private int updateTime = 200;
 	private Scene scene;
 	private Group group;
 	private TestManager gameManager;
@@ -30,12 +28,7 @@ public class GameApplication extends Application{
 	
 	@Override
 	public void start(Stage primaryStage) throws Exception {
-		updateTime = 200;
-		
 		map = new Map(this);
-		hero = map.getHero();
-		gameManager = new TestManager(this, hero);
-		map.setManager(gameManager);
 		
 		group = new Group(map);
 		group.setManaged(false);
@@ -44,31 +37,28 @@ public class GameApplication extends Application{
 		if (!DEBUG){
 		root.setPrefSize((Map.WINDOW_X) * Map.TILE_SIZE, 
 				(Map.WINDOW_Y) * Map.TILE_SIZE);
-			updateCamera();
+			//updateCamera();
 		}
 		else{
 			root.setPrefSize(Map.X_DIM_TILES * Map.TILE_SIZE,
 					Map.Y_DIM_TILES * Map.TILE_SIZE);
 		}
-		
+		gameManager = new TestManager(this, map);
 		scene = new Scene(root);
 		
 		setUpKeyPresses();
 		setUpAnimation();
 		
-		
 		primaryStage.setScene(scene);
 		primaryStage.show();
 	}
-	public TestManager getManager(){
-		return gameManager;
-	}
+	
 	/*
 	 * creates animation that is updated every updateTime interval
 	 */
 	private void setUpAnimation() {
         EventHandler<ActionEvent> eventHandler = (ActionEvent e) -> {
-        	//updateCamera();
+        	gameManager.animationLoop();
         };
         animation = new Timeline(new KeyFrame(Duration.millis(updateTime), 
         		eventHandler));
@@ -76,20 +66,15 @@ public class GameApplication extends Application{
         animation.play();
     }
 	
-	/* OBSOLETE
-	 * if the hero is within the constraints of the screen
-	 * after moving, the visible screen will be shifted to follow
-	 * the character
+	/**
+	 * Initialize camera to be following hero.
+	 * @param hero
 	 */
-	public void updateCamera(){
-		if (hero.getX() + Map.DELTA_X <= TestBoard.X_DIM_TILES 
-				&& hero.getX() - Map.CAMERA_X >= 0)
-			group.setTranslateX(-hero.imageX()
-					+ (Map.CAMERA_X) * Map.TILE_SIZE);
-		if (hero.getY() - Map.CAMERA_Y >= 0 && hero.getY() + Map.DELTA_Y
-				<= TestBoard.Y_DIM_TILES)
-			group.setTranslateY(-hero.imageY()
-					+ (Map.CAMERA_Y) * Map.TILE_SIZE);
+	public void setUpCamera(Hero hero){
+		group.setTranslateX(-hero.imageX()
+				+ (Map.CAMERA_X) * Map.TILE_SIZE + hero.getRelX() * Map.TILE_SIZE);
+		group.setTranslateY(-hero.imageY()
+				+ (Map.CAMERA_Y) * Map.TILE_SIZE + hero.getRelY() * Map.TILE_SIZE);
 	}
 	public Group getGroup(){
 		return group;
@@ -116,7 +101,12 @@ public class GameApplication extends Application{
                 case E:
                 	gameManager.e();
                     break;
+                default:
+                	break;
             }
         });
+		scene.setOnMouseClicked(e -> {
+			gameManager.click();
+		});
 	}
 }
